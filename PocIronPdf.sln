@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36623.8 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OcrServer.Iron", "OcrServer_IronPdf\OcrServer.Iron.csproj", "{EB02475D-33F3-4BEF-915D-7996263A157E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OcrCore.Iron", "OcrCore.Iron\OcrCore.Iron.csproj", "{84AB4B65-75E3-4E13-9DE2-7B2E38B15272}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{EB02475D-33F3-4BEF-915D-7996263A157E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EB02475D-33F3-4BEF-915D-7996263A157E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EB02475D-33F3-4BEF-915D-7996263A157E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EB02475D-33F3-4BEF-915D-7996263A157E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{84AB4B65-75E3-4E13-9DE2-7B2E38B15272}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{84AB4B65-75E3-4E13-9DE2-7B2E38B15272}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{84AB4B65-75E3-4E13-9DE2-7B2E38B15272}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{84AB4B65-75E3-4E13-9DE2-7B2E38B15272}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {93D6C79C-1FC4-4842-9DBF-0845B47D3800}
+	EndGlobalSection
+EndGlobal

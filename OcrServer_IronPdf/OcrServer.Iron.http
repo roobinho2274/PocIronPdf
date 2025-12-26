@@ -1,0 +1,6 @@
+@OcrServer_IronPdf_HostAddress = http://localhost:5199
+
+GET {{OcrServer_IronPdf_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
