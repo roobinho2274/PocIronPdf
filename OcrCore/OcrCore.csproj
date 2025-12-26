@@ -6,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="IronOcr" Version="2025.12.3" />
+    <PackageReference Include="IronPdf" Version="2025.12.2" />
+  </ItemGroup>
+
 </Project>
