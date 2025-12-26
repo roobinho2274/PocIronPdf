@@ -1,0 +1,173 @@
+﻿
+Abaixo está um **relatório comparativo** das duas POCs (Open-Source PDFium+Tesseract vs. IronPDF+IronOCR), com **pontos fortes/fracos**, riscos operacionais e **recomendação de servidor físico** para ~**1000 PDFs/dia** e até **100 acessos simultâneos**.
+
+---
+
+# Relatório – POC OCR em Docker Linux (.NET 8)
+
+## 1) Escopo e premissas
+
+* Pipeline: **PDF → extração de texto** (quando houver) **→ OCR** quando necessário → **TXT**.
+* Volume: ~**1000 arquivos/dia** (≈ 42/h em média, mas com picos).
+* Concor­rência: até **100 acessos simultâneos** à API (nem todos rodando OCR ao mesmo tempo, mas pode ocorrer).
+* Execução em **Docker Linux**, API ASP.NET Core com Swagger.
+
+---
+
+# 2) POC A – Open-Source (PDFiumSharp + PdfPig + Tesseract 5)
+
+## Pontos fortes
+
+* **Custo/lock-in**: sem licença por uso; melhor previsibilidade de custo.
+* **Controle técnico**: você controla totalmente o Tesseract, tessdata, DPI, PageSegMode, caching, etc.
+* **Maturidade/portabilidade**: Tesseract é amplamente usado; ajuste via `TESSDATA_PREFIX` e paths é bem conhecido (e já apareceu no seu diagnóstico). ([GitHub][1])
+* **Performance previsível**: dá pra “tunear” (DPI 200–300, limitação de páginas, fallback seletivo, paralelismo).
+
+## Pontos fracos / riscos
+
+* **DevOps mais chato**: dependências nativas e nomes de libs (ex.: `libtesseract50.so`, `libleptonica-1.82.0.so`) exigem cuidado (você já teve que criar symlinks).
+* **Qualidade OCR varia mais** com PDFs difíceis (scan ruim, tabelas, baixa resolução) – tuning é obrigatório.
+* **Robustez**: precisa de tratamento de exceções por página, timeouts e limites de tamanho.
+* **Manutenção**: atualização de PDFium/Tesseract pode quebrar o “setup” Linux (mudança de libnames, etc.).
+
+## Considerações operacionais (A)
+
+* Para alta concorrência, **não deixe OCR rodar direto no thread do request**.
+* Melhor modelo: **API enqueue → workers processam → API devolve status/resultado**.
+
+---
+
+# 3) POC B – IronPDF + IronOCR (pagos)
+
+## Pontos fortes
+
+* **Produtividade/qualidade**: tende a entregar resultado “mais pronto” com menos tuning, principalmente em PDFs complexos, imagens e rotinas de rasterização/extração integradas.
+* **Documentação e suporte comercial**: forte para ambientes corporativos.
+* **Foco Docker/Linux**: existe guia oficial para Linux e Docker. ([ironpdf.com][2])
+* **Runtime Linux específico**: o `IronOcr.Linux` é a forma “certa” de levar nativos para Docker. ([NuGet][3])
+
+## Pontos fracos / riscos
+
+* **Licenciamento**: no container ele pode “entender” como produção e exigir licença (“Production License Required”), o que você já viu. ([ironsoftware.com][4])
+* **Dependências nativas escondidas**: problemas como `libpng12.so` em Debian moderno podem aparecer (você viu isso). Isso vira risco de operação.
+* **Lock-in**: custo recorrente e dependência do fornecedor; precisa planejar renewal/auditoria de licenças.
+* **Ambiente “Production vs Development”**: depender de ambiente para liberar uso é frágil; o correto é **licença aplicada** e monitoramento.
+
+## Considerações operacionais (B)
+
+* **Sempre** tratar o licenciamento como parte do deploy (env var secret + validação em startup).
+* Para escala, o padrão continua sendo: **API leve + fila + workers**.
+
+---
+
+# 4) Comparação direta (resumo executivo)
+
+### Custos
+
+* **Open-Source**: custo zero de licença, custo maior em engenharia/DevOps e tuning.
+* **Iron**: custo de licença + menor custo de engenharia (tendência), mas risco de “surpresas” em runtime/produção e compliance.
+
+### Estabilidade no Linux/Docker
+
+* **Open-Source**: estável quando o Dockerfile fica “fixo”, mas exige conhecimento de libs e tessdata.
+* **Iron**: estável quando o pacote runtime Linux e dependências do SO estão corretos; se não, falha com mensagens de deploy nativo (como você viu). ([ironsoftware.com][5])
+
+### Escalabilidade (100 concorrentes)
+
+* **Empate conceitual**: ambos precisam do mesmo desenho:
+
+  * **limitar concorrência do OCR**
+  * **evitar processar OCR dentro do request**
+  * **fila + workers + storage de resultados**
+
+---
+
+# 5) Recomendação de arquitetura para produção (para as duas)
+
+Para 1000 PDFs/dia e até 100 usuários:
+
+## Modelo recomendado
+
+1. **API (Ingress)**
+
+   * Recebe upload
+   * Gera `jobId`
+   * Salva PDF em storage (disco/NAS/S3/Blob)
+   * Enfileira job
+2. **Fila**
+
+   * RabbitMQ / Redis / Azure Service Bus (dependendo do stack)
+3. **Workers OCR**
+
+   * N instâncias em containers
+   * Consumem fila e geram TXT
+4. **API (Query)**
+
+   * `GET /jobs/{id}` status
+   * `GET /jobs/{id}/result` baixa TXT
+
+Isso evita:
+
+* timeouts em request
+* estouro de memória em uploads grandes
+* “Internal Server Error” por processamento longo
+
+(Para uploads grandes, prefira streaming/unbuffered quando necessário.) ([Microsoft Learn][6])
+
+---
+
+# 6) Dimensionamento de servidor físico (baseline)
+
+Sem GPU (OCR clássico é CPU-bound). Para começar bem:
+
+## Servidor “Base” (recomendado)
+
+* **CPU**: 8 a 16 cores (ex.: Xeon/EPYC ou i7/i9 equivalente)
+* **RAM**: 32 GB (mínimo 16 GB)
+* **Disco**:
+
+  * SSD NVMe 500 GB+
+  * espaço para spool `/tmp`, PDFs temporários, resultados e logs
+* **Rede**: 1 Gbps
+* **SO**: Linux (Debian/Ubuntu) ou Windows Server (se optar por evitar dores Linux, mas Docker fica mais pesado)
+* **Docker** + observabilidade (logs estruturados + métricas)
+
+## Escalabilidade
+
+* O componente escalável é o **worker OCR**:
+
+  * Comece com **2–4 workers**
+  * Limite cada worker a **1–2 OCR simultâneos** (se não, você “mata” CPU/RAM)
+  * Escale horizontalmente (mais containers/VMs)
+
+## Quando “precisa de um servidor de OCR” separado?
+
+* Se o OCR for “pico pesado” (muitos scans grandes), **sim**: separar API e OCR evita travar requests.
+* Se a maioria dos PDFs tiver texto extraível (sem OCR), dá pra manter juntos no início, mas eu ainda recomendo separar.
+
+---
+
+# 7) Recomendação final para decisão interna
+
+### Se a empresa quer previsibilidade de custo e autonomia
+
+✅ **Open-Source** (PDFium+Tesseract) + boa arquitetura (fila/workers)
+→ maior esforço inicial, menor custo recorrente.
+
+### Se a empresa quer “resultado rápido” e suporte comercial
+
+✅ **Iron**
+→ resolve rápido, mas **exige governança de licença** e validação do runtime Linux/Docker (principalmente em imagens Debian/Ubuntu). ([ironsoftware.com][4])
+
+---
+
+## Próximo passo (bem prático)
+
+Se você quiser, eu te devolvo este relatório em **formato Word/PDF** e com uma **matriz de decisão** (peso por critério: custo, prazo, qualidade, risco, manutenção) para você apresentar internamente.
+
+[1]: https://github.com/charlesw/tesseract/issues/103?utm_source=chatgpt.com "location used by .net wrapper for trained data · Issue #103"
+[2]: https://ironpdf.com/get-started/linux/?utm_source=chatgpt.com "Installing IronPDF on Linux"
+[3]: https://www.nuget.org/packages/IronOcr.Linux?utm_source=chatgpt.com "IronOcr.Linux 2025.11.31"
+[4]: https://ironsoftware.com/csharp/ocr/get-started/license-keys/?utm_source=chatgpt.com "Applying .NET 10 License Keys for Your IronOCR Project"
+[5]: https://ironsoftware.com/csharp/ocr/get-started/advanced-installation-nuget/?utm_source=chatgpt.com "Advanced NuGet Installation for C# Tesseract"
+[6]: https://learn.microsoft.com/en-us/aspnet/core/mvc/models/file-uploads?view=aspnetcore-10.0&utm_source=chatgpt.com "Upload files in ASP.NET Core"

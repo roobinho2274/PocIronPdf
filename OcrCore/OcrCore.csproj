@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="IronOcr" Version="2025.12.3" />
+    <PackageReference Include="IronOcr.Linux" Version="2025.12.3" />
     <PackageReference Include="IronPdf" Version="2025.12.2" />
   </ItemGroup>
 

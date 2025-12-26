@@ -38,7 +38,7 @@ public class OcrController(IIronOcrExtractor ocr, ILogger<OcrController> logger)
                 Langs = request.Langs
             };
 
-            var text = await OCR.ExtractCleanTextAsync(tempPdf, opts);
+            var text = await OCR.ExtractCleanTextAsync(tempPdf, opts, HttpContext.RequestAborted);
 
             LOGGER.LogInformation("IRON OCR OK in {ElapsedMs}ms file={File} size={Size}",
                 sw.ElapsedMilliseconds, request.File.FileName, request.File.Length);
